@@ -1,0 +1,53 @@
+{
+  "measurement_date": "2026-10-29",
+  "vectors": 5162,
+  "unsaturated_vectors": 4382,
+  "distinct_results": 126,
+  "apb_checks": 67124,
+  "core_sampled_cycles": 1,
+  "functional_scope": "Directed/deterministic vector agreement; zero-delay mapped/routed simulation; not exhaustive equivalence proof or SDF simulation.",
+  "clock_period_ns": 20,
+  "corner": "SKY130 HD TT 25 C 1.80 V; nominal OpenRCX rules",
+  "setup_worst_slack_ns_rounded": 11.72,
+  "hold_worst_slack_ns_rounded": 0.12,
+  "electrical_violations": 0,
+  "magic_drc_errors": 0,
+  "route_drc_entries": 0,
+  "lvs_devices": 874,
+  "lvs_nets": 921,
+  "lvs_scope": "Hierarchical standard-cell comparison; supply/body pins retained; physical filler/tap classes exempted by PDK setup. No rail stripping.",
+  "gds_cells": 69,
+  "top_instances": 10860,
+  "bbox_um": [
+    0.0,
+    6.8,
+    174.70000000000002,
+    172.72
+  ],
+  "spef_nets": 911,
+  "negative_clock_slack_ns": -7.2826,
+  "negative_controls": [
+    "Corrupt expected result rejected by core/APB observers",
+    "One disconnected result-Q reference rejected by LVS",
+    "1 ns clock violates extracted setup"
+  ],
+  "exclusions": [
+    "Reset recovery/removal and distribution",
+    "Other PVT/RC corners",
+    "Antenna/density/IR/EM/signoff",
+    "Pad/ESD design",
+    "FPGA board or fabricated silicon"
+  ],
+  "files_sha256": {
+    "src/sobel.c": "3a4364b3fc285e0ba29eb2e71d440e7281733eec38cceeb52eb63f1cd619ca99",
+    "reference/vectors.mem": "5a2b5675bbe5d96b01e9e1eda3abe630ccec4fb5d201daeaf368f03e34303a04",
+    "build/hls/sobel3x3.v": "4f4672ec2c57317d8bc370edecb24e6b41cc951e6b8651941e42737f613b7d28",
+    "build/mapped.v": "7eefa7da43725df606a077ab4bc29c03bf1bf3b2abc3b2c1ba78f896c6053c5e",
+    "build/routed.v": "90c1beb31517808b9b424a057364686c327ca998dd65812112a2e51a0cdf493b",
+    "build/routed_power.v": "34abc47a3d47aadb0b9451862b9d0069f4019cc3e311f2aadd984ab93c623661",
+    "build/sobel_apb.gds": "291d232c9ae756000a40b80604b28cd69207a627f04861b16dabc727ed0ddabf",
+    "build/route.def": "e97095463120ccffb92e5bc60637d598e1a419f76b2268fa8119a93f97154ce8",
+    "build/route.spef": "c99e744da86cdea538ecbe37e00471f993db9187d536356681c12aa38daa38d5",
+    "scripts/constraints.sdc": "5ca850445d4fd2b6dae868fe55e35630ee64ab0165cbf69c2f4b96eba4af2882"
+  }
+}

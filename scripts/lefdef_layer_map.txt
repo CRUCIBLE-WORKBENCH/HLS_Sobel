@@ -1,0 +1,23 @@
+# SKY130 GDS layer mapping for top-level DEF routing, pins and special nets.
+# Cut layers carry via connectivity. Metal VIA enclosure purposes are omitted
+# because the same metal landing pad can belong to either adjacent cut layer.
+li1   LEFPIN,PIN,NET,SPNET   67 20
+li1   LABEL                  67 5
+mcon  LEFPIN,PIN,NET,SPNET,VIA   67 44
+met1  LEFPIN,PIN,NET,SPNET   68 20
+met1  LABEL                  68 5
+via   LEFPIN,PIN,NET,SPNET,VIA   68 44
+met2  LEFPIN,PIN,NET,SPNET   69 20
+met2  LABEL                  69 5
+via2  LEFPIN,PIN,NET,SPNET,VIA   69 44
+met3  LEFPIN,PIN,NET,SPNET   70 20
+met3  LABEL                  70 5
+via3  LEFPIN,PIN,NET,SPNET,VIA   70 44
+met4  LEFPIN,PIN,NET,SPNET   71 20
+met4  LABEL                  71 5
+via4  LEFPIN,PIN,NET,SPNET,VIA   71 44
+met5  LEFPIN,PIN,NET,SPNET   72 20
+met5  LABEL                  72 5
+NAME  met2/PIN   69 5
+NAME  met3/PIN   70 5
+NAME  met5/PIN   72 5

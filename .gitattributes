@@ -1,0 +1,16 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.v text eol=lf
+*.tcl text eol=lf
+*.spice text eol=lf
+*.magicrc text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.pdf binary
+*.pptx binary
+
+Makefile text eol=lf

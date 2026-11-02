@@ -1,0 +1,1 @@
+Recorded local demonstration results and dependency identities. Raw simulation, timing, DRC/LVS logs and generated EDA artifacts are excluded from Git; regenerate them with the README commands before running the observer. The summaries and document hashes do not replace raw evidence. Measurement scope and exclusions are stated in the whitepaper.
