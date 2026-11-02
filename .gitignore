@@ -19,7 +19,6 @@
 !/reference/corrupt_expected.mem
 !/reference/vector_count.vh
 !/scripts/
-!/scripts/demo_info.py
 /scripts/*
 !/scripts/reference.sh
 !/scripts/reference.py
@@ -52,3 +51,5 @@
 **/SKILL.md
 **/GATES.md
 **/WORKLOG.md
+
+!/scripts/demo_info.py

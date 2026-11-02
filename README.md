@@ -2,6 +2,16 @@
 
 PandA Bambu generates the actual Verilog arithmetic for a saturated eight-bit Sobel window kernel. An APB wrapper supplies pixels and captures the result. Independent C/Python reference checks, RTL and gate simulations, routed timing, Magic DRC and hierarchical Netgen LVS test the implementation at the scope below. **Crucible is beta.**
 
+- [Quick start](#quick-start)
+- [How it works](#how-it-works)
+- [What runs](#what-runs)
+- [Repository layout](#repository-layout)
+- [Individual stages](#individual-stages)
+- [Results and controls](#results-and-controls)
+- [Troubleshooting](#troubleshooting)
+- [Reports and limits](#reports-and-limits)
+- [Licence](#licence)
+
 The reviewed [twelve-page PDF](docs/Sobel_HLS_APB_SKY130_Ignytion_A4.pdf) and [editable A4 PowerPoint](docs/Sobel_HLS_APB_SKY130_Ignytion_A4.pptx) are included. [Compact results](evidence/summary.json), [dependency identities](evidence/dependencies.json) and [document hashes](evidence/documents.sha256.json) preserve the recorded measurements. Raw logs and generated builds stay outside Git.
 
 ## Recorded result
@@ -35,215 +45,139 @@ Supply nine unsigned byte pixels p0 through p8 in row-major order. Compute `gx =
 
 Reset is active low. APB accesses have no wait states; setup phases have no write side effects. Invalid/unaligned addresses and writes to status/result return errors. The generated arithmetic is combinational and done follows start. The wrapper captures the result on the following core-completion edge, before the next legal APB access; this is not a multi-cycle backpressure demonstration.
 
-## Prerequisites
+## Quick start
 
-Use the tested Linux x86-64/WSL route with an existing Crucible beta installation, Bash, host GCC and Python 3. The existing `crucible.lock` pins Bambu, Yosys, OpenROAD, Icarus, KLayout stream tools, Magic and Netgen artifacts. Bambu's packaged archive is approximately 1.39 GB and may need downloading on a new machine.
+Open a Linux/WSL terminal in this repository root. Crucible is beta. A complete SKY130A PDK, host GCC, native runtime libraries and the locked Bambu/RTL/physical tools are required. The Bambu archive is approximately 1.39 GB on initial acquisition. Required PDK views include HD LEF/Liberty/GDS/functional Verilog, Magic technology, Netgen setup and OpenRCX rules. The managed setup target installs pinned KLayout Python bindings into ignored build/observer.
 
-Provide a complete SKY130A PDK, including HD LEF/Liberty/GDS/functional Verilog views, Magic technology, Netgen setup and OpenRCX rules. PDK files and native runtime dependencies are not vendored. The default PDK location is `$HOME/.ciel/sky130A`; export `PDKPATH` to override it. `CAD_ROOT` may override the managed Magic library location. See [example configuration](config/example.env.sh) and the dependency hashes above.
-
-The final observer needs KLayout Python bindings, pinned in `requirements.txt`. It was run on the Windows host against WSL-generated artifacts; install compatible bindings in the Python environment where the observer is run. The C reference uses host GCC and Python's standard library. Native Windows/macOS/ARM tool acquisition and an independent clean-machine rebuild have not been demonstrated.
-
-## 1. Choose the correct shell and directory
-
-Run every Linux command below from this repository's root: the directory containing `crucible.toml`, `crucible.lock` and `scripts/`. The tested flow uses **WSL/Linux x86-64**. A Windows PowerShell block is labelled separately. Do not paste a PowerShell block into Bash or run a Bash block in PowerShell.
-
-Crucible must already be installed in that Linux/WSL shell. A PDK, Tcl-capable Magic where required, and native runtime libraries are separate prerequisites; this repository does not provide an installation archive for them. Commands containing `/path/to/...` require your actual dependency location before execution.
-
-## 2. Restore and inspect the Crucible environment
-
-Linux/WSL Bash:
-
-```bash
+```sh
 igny init
-igny --version
 igny workspace sync
-igny status
-igny env show hls-sobel
-igny tool show bambu --env hls-sobel
-igny tool show yosys --env hls-sobel
-igny tool show openroad --env hls-sobel
-igny tool show iverilog --env hls-sobel
-igny tool show magic --env hls-sobel
-igny tool show netgen --env hls-sobel
-igny tool show klayout-stream --env hls-sobel
+igny tool install make --version 4.4.1 --env hls-sobel
+igny run --env hls-sobel make setup
+igny run --env hls-sobel make check
 ```
 
-`igny init` initializes the outer workbench shell. `workspace sync` reads the supplied lock, acquires missing pinned artifacts and restores the recorded environment. It may download large archives; it does not build this design, provision a PDK, or install every native library. `status` should identify this workspace, and `env show` should list the tools in `hls-sobel`. `tool show` establishes the binary/provider resolution before a run.
+The default PDK is $HOME/.ciel/sky130A. Pass PDKPATH to Make for another complete installation; CAD_ROOT may override the managed Magic library root. [Dependency identities](evidence/dependencies.json) and [example configuration](config/example.env.sh) identify the measured inputs. The lock does not supply the PDK or host GCC.
 
-Stop on an acquisition/binding error and inspect its reported log. A successful version or inventory command is a prerequisite check, not a design PASS. The commands below select the same project environment explicitly through the scripts.
+Run the complete experiment after satisfying those prerequisites:
 
-## 3. Configure the PDK, host compiler and observer
-
-Linux/WSL Bash:
-
-```bash
-export PDKPATH="$HOME/.ciel/sky130A"
-# Alternative, after replacing this example with your actual path:
-# export PDKPATH='/path/to/sky130A'
-test -f "$PDKPATH/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib"
-test -f "$PDKPATH/libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef"
-test -f "$PDKPATH/libs.ref/sky130_fd_sc_hd/gds/sky130_fd_sc_hd.gds"
-test -f "$PDKPATH/libs.tech/magic/sky130A.tech"
-test -f "$PDKPATH/libs.tech/netgen/sky130A_setup.tcl"
-test -f "$PDKPATH/libs.tech/openlane/rcx_rules.info"
-gcc --version
-python3 --version
-igny run --env hls-sobel bambu --version
-igny run --env hls-sobel yosys -V
+```sh
+igny run --env hls-sobel make run PDKPATH=/path/to/sky130A
 ```
 
-GCC is the host compiler used to compile the C reference; it is not supplied by this project's tool lock. The PDK must also include technology LEF, functional cell Verilog and primitives. `CAD_ROOT` may override the managed Magic library root if the workbench payload location differs.
+Every executable example in this guide goes through Igny. Make delegates to the supplied stage scripts and observers; failed stages stop the workflow. Make 4.4.1 is installed separately from the existing engineering-tool lock. The setup target uses the Igny-launched Python interpreter to install requirements.txt into an ignored project-local prefix at build/observer, then checks the imported module locations. It does not change system Python or a shared tool payload. The check target checks observer imports; it does not qualify a PDK or native-library installation.
 
-### Python observer setup
+## How it works
 
-The measured route used the **Windows Python observer against WSL-generated files**. In Windows PowerShell, from this same repository root:
+Bambu generates the arithmetic from the actual C function. An APB wrapper supplies a complete nine-byte window and captures the saturated eight-bit result. The C/reference vectors, generated core, APB transactions and mapped/routed netlists are checked separately. Physical verification reads actual streamed geometry and retains supply/body connectivity.
 
-```powershell
-python --version
-python -m venv .venv-win
-.\.venv-win\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv-win\Scripts\python.exe -c "import klayout.db; print('Observer imports available')"
+```mermaid
+flowchart LR
+    C[Actual C Sobel kernel] --> B[PandA Bambu generated RTL]
+    C --> R[Independent frozen numerical reference]
+    B --> A[APB adapter and transaction tests]
+    R --> A
+    A --> Y[Yosys mapped design]
+    Y --> O[OpenROAD routed DEF / SPEF]
+    O --> G[Stream GDS / Magic DRC / hierarchical LVS]
+    O --> T[Extracted nominal timing and electrical checks]
+    G --> V[Independent observer and causal controls]
+    T --> V
 ```
 
-Use that explicit virtual-environment interpreter for the PowerShell verification commands below; activation and execution-policy changes are unnecessary. The virtual environment is ignored by Git. Package installation needs access to the configured Python package index.
+## What runs
 
-If running the observer entirely in Linux instead, install the same requirements in a Linux Python environment:
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -c "import klayout.db; print('Observer imports available')"
-```
-
-The two Python environments are alternatives. A Windows virtual environment cannot be used as a Linux interpreter. Independent clean-machine reproduction remains unverified.
-
-## 4. Run every engineering stage in order
-
-Linux/WSL Bash:
-
-```bash
-bash scripts/reference.sh
-bash scripts/run.sh hls
-bash scripts/run.sh core
-bash scripts/run.sh apb
-bash scripts/run.sh synth
-bash scripts/run.sh mapped
-bash scripts/run.sh physical
-bash scripts/run.sh stream
-bash scripts/run.sh routed
-bash scripts/physical_verify.sh
-bash scripts/controls.sh
-python3 scripts/provenance.py
-```
-
-| Stage | Work performed / principal outputs |
+| Component | Pinned version |
 |---|---|
-| `reference.sh` | Compile actual C, compare with independent matrix kernels, enforce frozen cases; `reports/reference.json`, `reference/vectors.mem` |
-| `hls` | Actual Bambu generation; `build/hls/sobel3x3.v`, `reports/bambu.log` |
-| `core` | Generated RTL/vector comparisons plus corrupted-expected control; `reports/core_positive.log`, `reports/core_negative.log` |
-| `apb` | Register/start/result/consecutive-transfer checks and negative control; `reports/apb_*` |
-| `synth` | Expand the configured Liberty path and map the real generated design; `build/mapped.v`, `reports/synthesis.log` |
-| `mapped` | Same APB suite with unchanged official functional cell models; `reports/mapped_positive.log` |
-| `physical` | Floorplan, PDN/taps, placement/repair, CTS/hold repair, routing and OpenRCX; DEF/ODB/SPEF plus `reports/physical.log` |
-| `stream` | Add physical supply ports and stream actual cell geometry with the explicit layer map; `build/sobel_apb.gds`, `build/routed_power.v` |
-| `routed` | Same functional suite against the final routed netlist; `reports/routed_positive.log` |
-| `physical_verify.sh` | Read GDS in Magic, check/extract, compare hierarchical supply-retaining netlists; `reports/magic_drc_extract.log`, `reports/lvs.log` |
-| `controls.sh` | Disconnect one result-Q in a scratch LVS reference and analyse the route at 20 ns / deliberately infeasible 1 ns; `reports/lvs_negative.log`, `reports/sta.log`, timing/electrical reports |
-| `provenance.py` | Hash the actual PDK input views; `reports/dependencies.json` |
+| bambu | 2024.10 |
+| iverilog | 14.0.0 |
+| klayout-stream | 0.30.10 |
+| magic | 8.3.682 |
+| netgen | 1.5.323 |
+| openroad | 26Q3-771-g7cfb2105c9 |
+| yosys | 0.63.0 |
 
-The generated Bambu file preserves upstream notices and remains a generated build artifact. The adapter only maps actual core ports. `simulation_models.py` selects unchanged used PDK functional modules after preprocessing. No handwritten Sobel replacement or fabricated cell model is inserted.
+The lock restores those engineering tools; the setup target prepares only project-local observer dependencies where needed. Initial acquisition may require network access. Native Windows/macOS/ARM tool execution and independent clean-machine reproduction are not established by these results.
 
-## 5. Run the final observer and inspect all result classes
+## Repository layout
 
-Windows PowerShell:
-
-```powershell
-.\.venv-win\Scripts\python.exe scripts\verify.py
+```text
+.
+|-- Makefile             Managed workflow entry points
+|-- crucible.toml        Workspace selection
+|-- crucible.lock        Engineering-tool identities
+|-- src/                 Actual C kernel
+|-- reference/           Frozen vectors and deliberately corrupted expectation
+|-- rtl/                 Core adapter and APB wrapper
+|-- tests/               Independent numerical and bus benches
+|-- scripts/             HLS, physical flow, verification and provenance
+|-- docs/                Reviewed PDF and editable PowerPoint
+|-- evidence/            Compact reviewed measurement snapshots
+`-- build/               Generated local artifacts; ignored by Git
 ```
 
-Or, with the Linux Python environment from step 3:
+## Individual stages
 
-```bash
-.venv/bin/python scripts/verify.py
-```
+Run these from the same prepared workspace. Stages use earlier outputs; execute them in the listed order when reproducing the flow manually. The run target performs the full ordered workflow.
 
-Require `SOBEL_NUMERICAL_APB_PHYSICAL_AND_NEGATIVE_CONTROLS_VERIFIED`. The core must report `vectors=5162 max_cycles=1`. APB, mapped and routed runs must each report `checks=67124`. The wrong-expected-byte controls must fail at vector 0, expected 1 and observed 0, with simulator exit 1. The runner treats those intentional failures as successful guard tests.
-
-Linux/WSL log inspection:
-
-```bash
-cat reports/core_positive.log
-cat reports/core_negative.log
-cat reports/apb_positive.log
-cat reports/apb_negative.log
-cat reports/mapped_positive.log
-cat reports/routed_positive.log
-tail -n 10 reports/sta.log
-cat reports/electrical.rpt
-cat reports/check_setup.rpt
-tail -n 12 reports/lvs.log
-tail -n 12 reports/lvs_negative.log
-tail -n 12 reports/timing_negative.rpt
-cat reports/summary.json
-```
-
-The observer requires an empty routing-DRC report, zero Magic DRC errors, unique LVS matching with VPWR/VGND retained, nonnegative extracted setup/hold slack and no reported electrical violations. Reset is explicitly excluded from timing; the setup-check warning for `preset_n` is documented, not silently removed. The scratch disconnected-Q reference must not match. The 1 ns analysis must have negative setup slack; it does not modify the saved 20 ns implementation constraints.
-
-## 6. Troubleshooting
-
-| Symptom | Check and next action |
+| Managed command | Work performed |
 |---|---|
-| Bambu acquisition fails | Inspect the acquisition log; normal pinned artifact acquisition is required before HLS. No generated-core substitute is permitted |
-| C reference cannot compile | Check host GCC and the freestanding unsigned-char kernel; do not change expected vectors to match an error |
-| Missing `build/hls/sobel3x3.v` | Run actual `hls` before core/APB/synthesis |
-| Gate simulation port mismatch | Use the named APB port connections in the supplied testbench; routed declarations may be reordered |
-| Missing supply pin / LVS mismatch | Inspect the DEF-to-GDS pin map and actual extraction, including metal-5 names; keep power/body pins in the comparison |
-| Setup passes but electrical/hold check fails | Inspect extracted reports; all required checks must pass before treating the candidate as verified |
-| Magic cannot load its technology/runtime | Check PDK completeness, native dependencies and `CAD_ROOT` |
-| Observer lacks KLayout | Use the explicit Python environment prepared above |
+| `igny run --env hls-sobel make reference` | Compile C and generate/check the frozen independent vector set |
+| `igny run --env hls-sobel make hls` | Generate actual arithmetic RTL with Bambu |
+| `igny run --env hls-sobel make core` | Compare generated arithmetic with the vectors and corrupted-expectation control |
+| `igny run --env hls-sobel make apb` | Exercise register/start/result behaviour and its negative control |
+| `igny run --env hls-sobel make synth` | Map generated RTL with the real Liberty library |
+| `igny run --env hls-sobel make mapped` | Repeat APB checks with unchanged official cell models |
+| `igny run --env hls-sobel make physical` | Floorplan, place/repair, CTS, route and extract RC |
+| `igny run --env hls-sobel make stream` | Add physical supply ports and stream cell geometry |
+| `igny run --env hls-sobel make routed` | Repeat the functional suite against the final routed netlist |
+| `igny run --env hls-sobel make physical-verify` | Check/extract GDS in Magic and compare hierarchical netlists |
+| `igny run --env hls-sobel make controls` | Reject disconnected result-Q LVS and deliberately infeasible timing |
+| `igny run --env hls-sobel make provenance` | Record hashes of actual PDK views |
 
-## 7. Open the whitepaper and check the public Git candidate
+Inspect or recheck existing results without rebuilding:
 
-Windows PowerShell, from the repository root:
-
-```powershell
-Invoke-Item .\docs\Sobel_HLS_APB_SKY130_Ignytion_A4.pdf
-Invoke-Item .\docs\Sobel_HLS_APB_SKY130_Ignytion_A4.pptx
-.\.venv-win\Scripts\python.exe scripts\preflight_git.py
+```sh
+igny run --env hls-sobel make smoke
+igny run --env hls-sobel make report
+igny run --env hls-sobel make help
 ```
 
-The preflight script uses Python's standard library, so `python scripts/preflight_git.py` also works in an existing Python environment. It checks documentation links, the exact document hashes, indexed/unignored paths, shell index modes, selected credential/personal-path patterns and Git whitespace. This is a public-candidate check; it does not rerun EDA tools.
+The smoke target validates existing generated evidence. It is not a new experiment run. The report target prints local summaries and fails if required results are absent. The sed target normalises only public shell inputs to LF; run invokes it automatically.
 
-Linux/WSL Git review, after reviewing the files selected by the repository allowlist:
+## Results and controls
 
-```bash
-git status --short
-git diff --check
-git add -- .
-git diff --cached --check
-python3 scripts/preflight_git.py
-git diff --cached --stat
-git diff --cached
+Require SOBEL_NUMERICAL_APB_PHYSICAL_AND_NEGATIVE_CONTROLS_VERIFIED. Recorded coverage is 5,162 windows and 67,124 comparisons per APB/mapped/routed run. Extracted nominal setup/hold slack is +11.72/+0.12 ns at 20 ns; DRC/electrical violation counts are zero and hierarchical LVS matches 874 devices/921 nets. Wrong expected bytes, disconnected result-Q and the infeasible 1 ns clock must fail for their intended causes.
+
+Expected negative failures are handled by the existing runners/observers. Missing tools, compilation failures, timeouts and missing artifacts do not count as successful controls. Changing sources or inputs requires rerunning the affected stages and their dependents. Raw logs and generated runtime/PDK payloads remain local.
+
+## Troubleshooting
+
+| Symptom | Check / next action |
+|---|---|
+| Wrong workspace or missing tool | Open the terminal in the root containing crucible.toml; use the explicit project environment in this guide and restore the lock. |
+| Make is not bound | Repeat the managed Make installation in Quick start. |
+| Observer dependency is absent or changed | Repeat the managed setup target; retain the pinned requirements. |
+| Native library or PDK is missing | Supply the prerequisites described above. Lock restoration and observer setup do not provision them. |
+| Evidence is missing or stale | Run the full workflow or the affected stages in order. Preserve the reported failure instead of editing expected values. |
+| Negative control unexpectedly passes | Treat the guard as failed and inspect its artifacts. |
+
+## Reports and limits
+
+Read the [technical report](docs/Sobel_HLS_APB_SKY130_Ignytion_A4.pdf) or its [editable PowerPoint](docs/Sobel_HLS_APB_SKY130_Ignytion_A4.pptx). The documents record measured results and exclusions; source commands in this README are the current managed workflow.
+
+One window-level L1-gradient kernel and a bounded APB contract. No frame buffering, border handling or exhaustive equivalence claim. Timing uses nominal TT 25 C/1.8 V extraction; this does not establish multi-corner signoff, fabrication or silicon performance.
+
+Review the source/document package locally with:
+
+```sh
+igny run --env hls-sobel make preflight
 ```
 
-Do not force-add ignored build products, PDK/runtime payloads, raw logs, local configuration or agent/work notes. The repository contains no invented project-wide licence grant; upstream dependencies retain their own terms.
+This checks the public candidate and document hashes; it does not publish anything or rerun engineering verification.
 
-The following are **manual commit/publication commands**, not steps already performed by this project. Review the staged content and choose your own author identity and public destination first. Run `remote add` only when this repository has no `origin`:
+## Licence
 
-```bash
-git branch --show-current
-git config user.name
-git config user.email
-git commit -m "Add verified HLS_Sobel demonstration and whitepaper"
-PUBLIC_REPOSITORY_URL='REPLACE_WITH_YOUR_PUBLIC_REPOSITORY_URL'
-git remote add origin "$PUBLIC_REPOSITORY_URL"
-git push -u origin HEAD
-```
+Dependencies retain their upstream licences and credit. This checkout has no project-wide licence grant; the owner must select the intended project licence before presenting it as an open-source release. No upstream endorsement is implied.
 
-Replace the destination placeholder before use. A new package is staged on `demo/verified`; the branch command confirms the actual current branch. If `origin` already exists, inspect it with `git remote get-url origin` and skip `remote add`. No commit, remote mutation or push is performed by the reproduction scripts.
-
-## Files and limits
-
-`src/` holds the C kernel; `rtl/` holds the port adapter and APB wrapper; `tests/` contains the core/APB observers; `reference/` retains the frozen vectors. `scripts/` implements HLS, synthesis, physical flow, extraction, controls and final verification. The DEF floorplan target is 180 by 180 micrometres; top-level GDS instance counts also include physical/via instances and should not be read as logic-cell counts.
-
-Excluded from the demonstrated scope: image line buffers, DMA/video timing, exhaustive APB compliance, exhaustive equivalence, SDF simulation, other PVT/RC corners, reset recovery/removal/distribution, antenna/density/IR/EM signoff, pad/ESD design, physical FPGA operation and fabricated silicon. Local DRC/LVS and GDS generation do not establish tapeout readiness.
+Source repository: [CRUCIBLE-WORKBENCH/HLS_Sobel](https://github.com/CRUCIBLE-WORKBENCH/HLS_Sobel).
